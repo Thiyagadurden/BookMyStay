@@ -1,67 +1,80 @@
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-class Reservation {
-    private String guestName;
-    private String roomType;
 
-    public Reservation(String guestName, String roomType) {
-        this.guestName = guestName;
-        this.roomType = roomType;
-    }
-
-    public String getGuestName() {
-        return guestName;
-    }
-
-    public String getRoomType() {
-        return roomType;
-    }
-
-    @Override
-    public String toString() {
-        return "Guest: " + guestName + ", Room Type: " + roomType;
+class InvalidRoomTypeException extends Exception {
+    public InvalidRoomTypeException(String message) {
+        super(message);
     }
 }
 
-class BookingHistory {
-    private List<Reservation> history = new ArrayList<>();
-
-    public void addRecord(Reservation reservation) {
-        history.add(reservation);
-    }
-
-    public List<Reservation> getAllRecords() {
-        return new ArrayList<>(history);
-    }
-}
-
-class BookingReportService {
-    public void generateSummaryReport(BookingHistory bookingHistory) {
-        List<Reservation> records = bookingHistory.getAllRecords();
-
-        System.out.println("Booking History Report");
-        if (records.isEmpty()) {
-            System.out.println("No records found.");
-        } else {
-            for (Reservation res : records) {
-                System.out.println(res);
-            }
-        }
+class InsufficientInventoryException extends Exception {
+    public InsufficientInventoryException(String message) {
+        super(message);
     }
 }
 
 public class BookMyStay {
+    private static Map<String, Integer> inventory = new HashMap<>();
+    private static List<String> validRoomTypes = Arrays.asList("Standard", "Deluxe", "Suite");
+
+    static {
+        // Initialize inventory
+        inventory.put("Standard", 2);
+        inventory.put("Deluxe", 1);
+        inventory.put("Suite", 5);
+    }
+
     public static void main(String[] args) {
-        System.out.println("Booking History and Reporting\n");
+        System.out.println("--- Book My Stay: Error Handling & Validation ---");
 
-        BookingHistory history = new BookingHistory();
-        BookingReportService reportService = new BookingReportService();
+        // Test Case 1: Valid Booking
+        processBooking("Guest_001", "Standard");
 
-        history.addRecord(new Reservation("Abhi", "Single"));
-        history.addRecord(new Reservation("Subha", "Double"));
-        history.addRecord(new Reservation("Vanmathi", "Suite"));
+        // Test Case 2: Invalid Room Type (Triggers Exception)
+        processBooking("Guest_002", "Penthouse");
 
-        reportService.generateSummaryReport(history);
+        // Test Case 3: Out of Stock (Triggers Exception)
+        processBooking("Guest_003", "Standard");
+        processBooking("Guest_004", "Standard"); // This should fail
+
+        System.out.println("\nFinal Inventory State: " + inventory);
+    }
+
+    /**
+     * Processes booking with Fail-Fast validation logic.
+     */
+    public static void processBooking(String guestName, String roomType) {
+        try {
+            System.out.println("\nProcessing request for " + guestName + " (Room: " + roomType + ")...");
+
+            // 1. Validate Room Type
+            validateRoomType(roomType);
+
+            // 2. Validate Inventory Availability
+            validateInventory(roomType);
+
+            // 3. Update State (Only reached if validations pass)
+            inventory.put(roomType, inventory.get(roomType) - 1);
+            System.out.println("SUCCESS: Booking confirmed for " + guestName);
+
+        } catch (InvalidRoomTypeException | InsufficientInventoryException e) {
+            // Graceful Failure Handling
+            System.err.println("VALIDATION FAILURE: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("SYSTEM ERROR: An unexpected error occurred.");
+        }
+    }
+
+    private static void validateRoomType(String roomType) throws InvalidRoomTypeException {
+        if (!validRoomTypes.contains(roomType)) {
+            throw new InvalidRoomTypeException("Room type '" + roomType + "' is not supported.");
+        }
+    }
+
+    private static void validateInventory(String roomType) throws InsufficientInventoryException {
+        int count = inventory.getOrDefault(roomType, 0);
+        if (count <= 0) {
+            throw new InsufficientInventoryException("No " + roomType + " rooms available in inventory.");
+        }
     }
 }
