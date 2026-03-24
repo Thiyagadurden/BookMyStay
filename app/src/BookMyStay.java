@@ -1,71 +1,54 @@
-import java.util.*;
+import java.util.LinkedList;
+import java.util.Queue;
+
+class BookingRequest {
+    String guestName;
+    int roomId;
+
+    public BookingRequest(String guestName, int roomId) {
+        this.guestName = guestName;
+        this.roomId = roomId;
+    }
+}
+
+class HotelInventory {
+    private boolean[] rooms = new boolean[5]; // 5 rooms, false = available
+
+    // Critical Section: Synchronized to prevent double allocation
+    public synchronized boolean bookRoom(int roomId, String guest) {
+        if (roomId < 0 || roomId >= rooms.length) return false;
+
+        if (!rooms[roomId]) {
+            // Simulate processing time to increase chance of race condition
+            try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+            rooms[roomId] = true; // Mark as booked
+            System.out.println("SUCCESS: Room " + roomId + " booked for " + guest);
+            return true;
+        } else {
+            System.out.println("FAILURE: Room " + roomId + " is already taken. Guest: " + guest);
+            return false;
+        }
+    }
+}
 
 public class BookMyStay {
-
-    // Simulating inventory: Room Type -> Available Count
-    private static Map<String, Integer> inventory = new HashMap<>();
-    // Tracking active bookings: Booking ID -> Room Details (Type:RoomID)
-    private static Map<String, String> activeBookings = new HashMap<>();
-    // Stack to track recently released room IDs for rollback history
-    private static Stack<String> releasedRoomsStack = new Stack<>();
-
-    static {
-        // Initializing inventory
-        inventory.put("Deluxe", 5);
-        inventory.put("Standard", 10);
-
-        // Simulating some initial confirmed bookings
-        activeBookings.put("B101", "Deluxe:D-101");
-        activeBookings.put("B102", "Standard:S-202");
-    }
-
-    /**
-     * Goal: Enable safe cancellation and inventory rollback.
-     */
-    public static void cancelBooking(String bookingId) {
-        System.out.println("\n--- Initiating Cancellation for ID: " + bookingId + " ---");
-
-        // 1. Validation: Ensure the reservation exists
-        if (!activeBookings.containsKey(bookingId)) {
-            System.out.println("Error: Cancellation failed. Booking ID not found or already cancelled.");
-            return;
-        }
-
-        // 2. Extract details for rollback
-        String bookingDetails = activeBookings.get(bookingId);
-        String[] parts = bookingDetails.split(":");
-        String roomType = parts[0];
-        String roomId = parts[1];
-
-        // 3. Rollback Operation: Release Room ID to Stack (LIFO)
-        releasedRoomsStack.push(roomId);
-        System.out.println("Step 1: Room " + roomId + " added to rollback stack.");
-
-        // 4. Inventory Restoration: Increment count immediately
-        inventory.put(roomType, inventory.get(roomType) + 1);
-        System.out.println("Step 2: Inventory for " + roomType + " restored. New count: " + inventory.get(roomType));
-
-        // 5. State Update: Remove from active bookings
-        activeBookings.remove(bookingId);
-        System.out.println("Step 3: Booking history updated. Cancellation Complete.");
-    }
-
-    public static void displayStatus() {
-        System.out.println("\n--- Current System State ---");
-        System.out.println("Inventory: " + inventory);
-        System.out.println("Active Bookings: " + activeBookings.keySet());
-        System.out.println("Recently Released Rooms (Stack): " + releasedRoomsStack);
-    }
-
     public static void main(String[] args) {
-        displayStatus();
+        HotelInventory inventory = new HotelInventory();
 
-        // Perform cancellation
-        cancelBooking("B101");
+        // Scenario: Multiple guests trying to book the SAME room (Room 1)
+        Runnable task1 = () -> inventory.bookRoom(1, "Alice");
+        Runnable task2 = () -> inventory.bookRoom(1, "Bob");
+        Runnable task3 = () -> inventory.bookRoom(2, "Charlie");
 
-        // Attempting to cancel a non-existent booking (Validation check)
-        cancelBooking("B999");
+        Thread thread1 = new Thread(task1);
+        Thread thread2 = new Thread(task2);
+        Thread thread3 = new Thread(task3);
 
-        displayStatus();
+        System.out.println("Starting concurrent booking simulation...");
+
+        thread1.start();
+        thread2.start();
+        thread3.start();
     }
 }
